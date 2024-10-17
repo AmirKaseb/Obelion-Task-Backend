@@ -29,10 +29,15 @@ jobs:
             # Step 2: Navigate to the directory
             cd /var/www/laravel-app
 
-            # Step 3: Clone the Laravel repository from GitHub
-            git clone https://github.com/laravel/laravel.git .
+            # Step 3: Clone the Laravel repository if it doesn't exist or pull updates if it does
+            if [ ! -d "/var/www/laravel-app/.git" ]; then
+              git clone https://github.com/laravel/laravel.git .
+            else
+              echo "Repository already exists. Pulling latest changes."
+              git pull origin main
+            fi
 
-            # Step 4: Set permissions
+            # Step 4: Set ownership of the app directory
             sudo chown -R ubuntu:ubuntu /var/www/laravel-app
 
             # Step 5: Install Composer if it's not installed
@@ -46,8 +51,10 @@ jobs:
             # Step 6: Install Laravel app dependencies
             composer install
 
-            # Step 7: Generate Laravel app key
-            php artisan key:generate
+            # Step 7: Generate Laravel app key (if necessary, skip if it's already done)
+            if ! php artisan key:generate --show; then
+              php artisan key:generate
+            fi
 
             # Step 8: Run migrations (this will connect to the RDS MySQL)
             php artisan migrate --force
@@ -55,5 +62,5 @@ jobs:
             # Step 9: Set proper permissions for storage and cache
             sudo chown -R www-data:www-data storage bootstrap/cache
 
-            # Step 10: Restart Apache or NGINX (based on your setup)
+            # Step 10: Restart Apache (or NGINX, depending on your setup)
             sudo systemctl restart apache2
