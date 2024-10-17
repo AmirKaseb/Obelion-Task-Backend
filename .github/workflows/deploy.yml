@@ -7,7 +7,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-22.04  # Use Ubuntu 22.04 for the runner
 
     steps:
     - name: Checkout code
@@ -16,12 +16,13 @@ jobs:
     - name: Build Docker image
       run: docker build -t laravel-app .  # Build the Laravel app Docker image
 
+    - name: Run Laravel migrations
+      run: |
+        docker run --rm -e APP_ENV=local laravel-app php artisan migrate --force  # Run migrations with --force
+
     - name: Run Laravel container
       run: |
-        docker run -d --name laravel-app -p 80:8000 laravel-app  # Bind container's port 8000 to host's port 80
-
-    - name: Run Laravel migrations
-      run: docker exec laravel-app php artisan migrate  # Run database migrations inside the running container
+        docker run -d --name laravel-app -p 80:8000 laravel-app  # Start the container after migrations
 
     - name: Check Laravel status
       run: curl -s http://localhost  # Verify that the Laravel app is running (on port 80)
