@@ -22,7 +22,7 @@ jobs:
 
     - name: Run Laravel container
       run: |
-        docker run -d --name laravel-app -p 80:8000 laravel-app  # Start the container after migrations
+        docker run -d --name laravel-app -p 8000:8000 laravel-app  # Start the container after migrations
 
     - name: Check Laravel status
-      run: curl -s http://localhost  # Verify that the Laravel app is running (on port 80)
+      run: curl -s http://localhost:8000  # Verify that the Laravel app is running (on port 80)
