@@ -1,66 +1,27 @@
-name: Deploy Laravel App to EC2 with RDS Connection
+name: Deploy Laravel App
 
 on:
   push:
     branches:
-      - main
+      - main  # Trigger on push to the 'main' branch
 
 jobs:
   deploy:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Check out the code
-        uses: actions/checkout@v2
+    - name: Checkout code
+      uses: actions/checkout@v2  # Get the latest code from the repository
 
-      - name: Deploy to EC2
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.EC2_HOST }}  # EC2 Public IP or DNS
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          port: 22
-          script: |
-            echo "Deploying Laravel App to EC2..."
+    - name: Build Docker image
+      run: docker build -t laravel-app .  # Build the Laravel app Docker image
 
-            # Step 1: Create the app directory if it doesn't exist
-            sudo mkdir -p /var/www/laravel-app
+    - name: Run Laravel container
+      run: |
+        docker run -d --name laravel-app -p 80:8000 laravel-app  # Bind container's port 8000 to host's port 80
 
-            # Step 2: Navigate to the directory
-            cd /var/www/laravel-app
+    - name: Run Laravel migrations
+      run: docker exec laravel-app php artisan migrate  # Run database migrations inside the running container
 
-            # Step 3: Clone the Laravel repository if it doesn't exist or pull updates if it does
-            if [ ! -d "/var/www/laravel-app/.git" ]; then
-              git clone https://github.com/laravel/laravel.git .
-            else
-              echo "Repository already exists. Pulling latest changes."
-              git pull origin main
-            fi
-
-            # Step 4: Set ownership of the app directory
-            sudo chown -R ubuntu:ubuntu /var/www/laravel-app
-
-            # Step 5: Install Composer if it's not installed
-            if ! command -v composer &> /dev/null
-            then
-              echo "Composer not found, installing..."
-              curl -sS https://getcomposer.org/installer | php
-              sudo mv composer.phar /usr/local/bin/composer
-            fi
-
-            # Step 6: Install Laravel app dependencies
-            composer install
-
-            # Step 7: Generate Laravel app key (if necessary, skip if it's already done)
-            if ! php artisan key:generate --show; then
-              php artisan key:generate
-            fi
-
-            # Step 8: Run migrations (this will connect to the RDS MySQL)
-            php artisan migrate --force
-
-            # Step 9: Set proper permissions for storage and cache
-            sudo chown -R www-data:www-data storage bootstrap/cache
-
-            # Step 10: Restart Apache (or NGINX, depending on your setup)
-            sudo systemctl restart apache2
+    - name: Check Laravel status
+      run: curl -s http://localhost  # Verify that the Laravel app is running (on port 80)
