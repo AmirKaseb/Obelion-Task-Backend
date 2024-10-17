@@ -34,6 +34,15 @@ jobs:
           echo "Pulling the latest code..."
           git pull origin main || git clone https://github.com/AmirKaseb/Obelion-Task-Backend.git .
 
+          # Check if the Laravel app container is already running, and stop & remove it if it is
+          echo "Checking if Laravel app container is running..."
+          docker ps -q -f name=laravel-app
+          if [ $? -eq 0 ]; then
+            echo "Stopping and removing the existing container..."
+            docker stop laravel-app
+            docker rm laravel-app
+          fi
+
           # Build Docker image 
           docker build -t laravel-app .
 
