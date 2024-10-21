@@ -71,3 +71,6 @@ jobs:
 
           # Run Laravel container
           docker run -d --name laravel-app -p 8000:8000 laravel-app
+
+          # Echo the IP and port
+          echo "Backend is working at http://${{ env.PUBLIC_IP }}:8000"
