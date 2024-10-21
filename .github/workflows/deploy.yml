@@ -10,11 +10,31 @@ jobs:
     runs-on: ubuntu-22.04  # Use Ubuntu 22.04 for the runner
 
     steps:
-    # Step 1: SSH into the remote server
+    # Step 1: Checkout the code
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    # Step 2: Set up AWS CLI
+    - name: Set up AWS CLI
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1  # Change this to your region if different
+
+    # Step 3: Retrieve EC2 instance public IP
+    - name: Retrieve EC2 instance IP
+      id: get_ip
+      run: |
+        INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=Obelion_backend_instance" --query "Reservations[0].Instances[0].InstanceId" --output text)
+        PUBLIC_IP=$(aws ec2 describe-instances --instance-ids $INSTANCE_ID --query "Reservations[0].Instances[0].PublicIpAddress" --output text)
+        echo "PUBLIC_IP=${PUBLIC_IP}" >> $GITHUB_ENV
+
+    # Step 4: SSH into EC2 and set up the app
     - name: SSH into EC2 and set up the app
       uses: appleboy/ssh-action@master
       with:
-        host: ${{ secrets.EC2_HOST }}
+        host: ${{ env.PUBLIC_IP }}
         username: ubuntu
         key: ${{ secrets.EC2_SSH_KEY }}
         port: 22
@@ -33,6 +53,15 @@ jobs:
           # Pull the latest code from the repository
           echo "Pulling the latest code..."
           git pull origin main || git clone https://github.com/AmirKaseb/Obelion-Task-Backend.git .
+
+          # Check if the Laravel app container is already running, and stop & remove it if it is
+          echo "Checking if Laravel app container is running..."
+          docker ps -q -f name=laravel-app
+          if [ $? -eq 0 ]; then
+            echo "Stopping and removing the existing container..."
+            docker stop laravel-app
+            docker rm laravel-app
+          fi
 
           # Build Docker image 
           docker build -t laravel-app .
