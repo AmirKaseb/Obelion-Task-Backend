@@ -30,7 +30,14 @@ jobs:
         PUBLIC_IP=$(aws ec2 describe-instances --instance-ids $INSTANCE_ID --query "Reservations[0].Instances[0].PublicIpAddress" --output text)
         echo "PUBLIC_IP=${PUBLIC_IP}" >> $GITHUB_ENV
 
-    # Step 4: SSH into EC2 and set up the app
+    # Step 4: Retrieve RDS endpoint
+    - name: Retrieve RDS Endpoint
+      id: get_rds
+      run: |
+        RDS_ENDPOINT=$(aws rds describe-db-instances --query "DBInstances[?DBInstanceIdentifier=='Obelion_MySqL_Database'].Endpoint.Address" --output text)
+        echo "RDS_ENDPOINT=${RDS_ENDPOINT}" >> $GITHUB_ENV
+
+    # Step 5: SSH into EC2 and set up the app
     - name: SSH into EC2 and set up the app
       uses: appleboy/ssh-action@master
       with:
@@ -40,20 +47,16 @@ jobs:
         port: 22
         script: |
           echo "Setting up Laravel app on EC2..."
-
           # Create a directory for the Laravel app if it doesn't exist
           if [ ! -d "/home/ubuntu/laravel-app" ]; then
             echo "Creating Laravel app directory..."
             mkdir -p /home/ubuntu/laravel-app
           fi
-
           # Navigate to the directory
           cd /home/ubuntu/laravel-app
-
           # Pull the latest code from the repository
           echo "Pulling the latest code..."
           git pull origin main || git clone https://github.com/AmirKaseb/Obelion-Task-Backend.git .
-
           # Check if the Laravel app container is already running, and stop & remove it if it is
           echo "Checking if Laravel app container is running..."
           docker ps -q -f name=laravel-app
@@ -62,15 +65,38 @@ jobs:
             docker stop laravel-app
             docker rm laravel-app
           fi
-
-          # Build Docker image 
+          # Build Docker image
           docker build -t laravel-app .
 
-          # Run migrations (if needed)
-          docker run --rm -e APP_ENV=local laravel-app php artisan migrate --force
+          # Set environment variables including the dynamic RDS endpoint
+          DB_CONNECTION=${{ secrets.DB_CONNECTION }}
+          DB_HOST=${{ env.RDS_ENDPOINT }}
+          DB_PORT=${{ secrets.DB_PORT }}
+          DB_DATABASE=${{ secrets.DB_DATABASE }}
+          DB_USERNAME=${{ secrets.DB_USERNAME }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
 
-          # Run Laravel container
-          docker run -d --name laravel-app -p 8000:8000 laravel-app
+          # Run migrations (if needed)
+          docker run --rm -e APP_ENV=local \
+                         -e DB_CONNECTION=$DB_CONNECTION \
+                         -e DB_HOST=$DB_HOST \
+                         -e DB_PORT=$DB_PORT \
+                         -e DB_DATABASE=$DB_DATABASE \
+                         -e DB_USERNAME=$DB_USERNAME \
+                         -e DB_PASSWORD=$DB_PASSWORD \
+                         laravel-app php artisan migrate --force
+
+          # Run Laravel container with the same environment variables
+          docker run -d --name laravel-app \
+                         -p 8000:8000 \
+                         -e APP_ENV=local \
+                         -e DB_CONNECTION=$DB_CONNECTION \
+                         -e DB_HOST=$DB_HOST \
+                         -e DB_PORT=$DB_PORT \
+                         -e DB_DATABASE=$DB_DATABASE \
+                         -e DB_USERNAME=$DB_USERNAME \
+                         -e DB_PASSWORD=$DB_PASSWORD \
+                         laravel-app
 
           # Echo the IP and port
           echo "Backend is working at http://${{ env.PUBLIC_IP }}:8000"
