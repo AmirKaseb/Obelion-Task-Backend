@@ -34,7 +34,7 @@ jobs:
     - name: Retrieve RDS Endpoint
       id: get_rds
       run: |
-        RDS_ENDPOINT=$(aws rds describe-db-instances --query "DBInstances[?DBInstanceIdentifier=='Obelion_MySqL_Database'].Endpoint.Address" --output text)
+        RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier obelion-mysql-database --query "DBInstances[0].Endpoint.Address" --output text --region us-east-1)
         echo "RDS_ENDPOINT=${RDS_ENDPOINT}" >> $GITHUB_ENV
 
     # Step 5: SSH into EC2 and set up the app
